@@ -94,6 +94,15 @@ export default async function HomePage() {
               <p className="text-gray-600">99.9% uptime with automatic backups and redundancy</p>
             </div>
           </div>
+
+          <div className="flex gap-4 justify-center">
+            <Button asChild>
+              <Link href="/auth/login">Sign In</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/auth/signup">Sign Up</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,80 +1,131 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { UserProfile } from "@/components/user-profile"
-import { SignOutButton } from "@/components/sign-out-button"
-import { FileUploadSection } from "@/components/file-upload-section"
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
+interface User {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  last_sign_in_at: string
+}
 
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data?.user) {
-    redirect("/auth/login")
+export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const {
+          data: { user: authUser },
+          error: authError,
+        } = await supabase.auth.getUser()
+
+        if (authError || !authUser) {
+          router.push("/signin")
+          return
+        }
+
+        // Get user profile data
+        const { data: profile, error: profileError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", authUser.id)
+          .single()
+
+        if (profileError) {
+          console.error("Error fetching user profile:", profileError)
+        } else {
+          setUser(profile)
+        }
+      } catch (error) {
+        console.error("Error:", error)
+        router.push("/signin")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    getUser()
+  }, [router, supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
-  // Get user profile data from our custom users table
-  const { data: userProfile, error: profileError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", data.user.id)
-    .single()
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
 
-  if (profileError) {
-    console.error("Error fetching user profile:", profileError)
+  if (!user) {
+    return null
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">Welcome back, {userProfile?.first_name || "User"}!</p>
-          </div>
-          <SignOutButton />
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <Button onClick={handleSignOut} variant="outline">
+            Sign Out
+          </Button>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2">
           {/* User Profile Card */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Your account details and information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UserProfile user={data.user} userProfile={userProfile} />
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Account Status</CardTitle>
-              <CardDescription>Your account overview</CardDescription>
+              <CardTitle>Profile Information</CardTitle>
+              <CardDescription>Your account details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Email Verified</span>
-                <span className={`text-sm ${data.user.email_confirmed_at ? "text-green-600" : "text-red-600"}`}>
-                  {data.user.email_confirmed_at ? "Yes" : "No"}
-                </span>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Name</label>
+                <p className="text-lg">
+                  {user.first_name} {user.last_name}
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Account Created</span>
-                <span className="text-sm text-gray-600">{new Date(data.user.created_at).toLocaleDateString()}</span>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Email</label>
+                <p className="text-lg">{user.email}</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Last Sign In</span>
-                <span className="text-sm text-gray-600">
-                  {userProfile?.last_signed_in ? new Date(userProfile.last_signed_in).toLocaleDateString() : "N/A"}
-                </span>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Last Sign In</label>
+                <p className="text-lg">
+                  {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : "First time signing in"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* File Upload Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>File Management</CardTitle>
+              <CardDescription>Upload and manage your files</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">File upload functionality coming soon</p>
+                <p className="text-sm text-gray-400">
+                  AWS S3 integration will be available once environment variables are configured
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
-
-        <FileUploadSection />
       </div>
     </div>
   )
